@@ -1,0 +1,70 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Accessibility: Focus indicators for keyboard navigation */
+@layer base {
+  /* Visible focus styles using :focus-visible for better UX */
+  *:focus-visible {
+    outline: 3px solid theme('colors.blue.500');
+    outline-offset: 2px;
+  }
+
+  /* High contrast focus for interactive elements */
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline: 3px solid theme('colors.blue.600');
+    outline-offset: 2px;
+  }
+
+  /* Focus styles for checkboxes */
+  input[type="checkbox"]:focus-visible {
+    outline: 3px solid theme('colors.blue.600');
+    outline-offset: 2px;
+    border-radius: 0.25rem;
+  }
+
+  /* Skip link for keyboard navigation */
+  .skip-link {
+    position: absolute;
+    top: -40px;
+    left: 0;
+    background: theme('colors.blue.600');
+    color: white;
+    padding: 0.5rem 1rem;
+    text-decoration: none;
+    z-index: 100;
+  }
+
+  .skip-link:focus {
+    top: 0;
+  }
+
+  /* Ensure sufficient color contrast */
+  .text-gray-600 {
+    color: theme('colors.gray.700');
+  }
+
+  /* Remove default focus styles when :focus-visible is supported */
+  *:focus:not(:focus-visible) {
+    outline: none;
+  }
+}
+
+/* Screen reader only text utility */
+@layer utilities {
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+  }
+}
