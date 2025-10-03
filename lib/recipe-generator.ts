@@ -42,7 +42,7 @@ class OllamaProvider implements LLMProvider {
           model: this.model,
           prompt,
           stream: false,
-          format: 'json',
+          // Removed format: 'json' - causes timeouts with large responses
         }),
       });
 
@@ -51,8 +51,15 @@ class OllamaProvider implements LLMProvider {
       }
 
       const data = await response.json();
-      const mealPlanData = JSON.parse(data.response);
 
+      // Extract JSON from response (model might include markdown code blocks)
+      let responseText = data.response;
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error('No JSON found in LLM response');
+      }
+
+      const mealPlanData = JSON.parse(jsonMatch[0]);
       return this.parseMealPlan(mealPlanData);
     } catch (error) {
       console.error('Ollama generation error:', error);
