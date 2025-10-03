@@ -15,7 +15,8 @@
       "WebFetch(domain:github.com)",
       "Bash(curl:*)",
       "Bash(ollama pull:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(brew services:*)"
     ],
     "deny": [],
     "ask": []
