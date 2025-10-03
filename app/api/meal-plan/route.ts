@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { SpoonacularService } from '@/lib/spoonacular';
+import { RecipeGeneratorService } from '@/lib/recipe-generator';
 import { prisma } from '@/lib/prisma';
 import { MealPlanRequestSchema } from '@/lib/validations';
 import { handleApiError, ApiError } from '@/lib/api-error';
@@ -27,10 +27,21 @@ export async function POST(request: NextRequest) {
     const { familySize, diet } = validation.data;
     console.log(`   Family size: ${familySize}, Diet: ${diet || 'none'}`);
 
-    // Generate meal plan
-    const spoonacular = new SpoonacularService();
+    // Generate meal plan using LLM
+    const provider = process.env.RECIPE_PROVIDER || 'ollama';
+    const config = {
+      ollamaUrl: process.env.OLLAMA_BASE_URL,
+      model: process.env.OLLAMA_MODEL,
+      geminiApiKey: process.env.GEMINI_API_KEY,
+    };
+
+    const recipeGenerator = new RecipeGeneratorService(
+      provider as 'ollama' | 'gemini',
+      config
+    );
+
     const mealPlanStartTime = Date.now();
-    const mealPlan = await spoonacular.generateWeeklyMealPlan(familySize, diet);
+    const mealPlan = await recipeGenerator.generateWeeklyMealPlan(familySize, diet);
     console.log(`   Meal plan generation: ${Date.now() - mealPlanStartTime}ms`);
 
     // Save meal plan to database
