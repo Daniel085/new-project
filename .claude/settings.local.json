@@ -14,7 +14,8 @@
       "Bash(npm run type-check:*)",
       "WebFetch(domain:github.com)",
       "Bash(curl:*)",
-      "Bash(ollama pull:*)"
+      "Bash(ollama pull:*)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []
