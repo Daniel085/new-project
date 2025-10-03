@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Family Meal Planner - A Next.js application that generates weekly meal plans using the Spoonacular API and automates adding ingredients to a Walmart cart using Puppeteer.
+Family Meal Planner - A Next.js application that generates weekly meal plans using local LLMs via Ollama and automates adding ingredients to a Walmart cart using Puppeteer.
 
 ## Commands
 
@@ -28,22 +28,26 @@ npx prisma studio    # Open Prisma Studio GUI
 
 ## Environment Setup
 
-Create a `.env.local` file with:
+Create a `.env` file with:
 ```
-DATABASE_URL="postgresql://user:password@localhost:5432/meal_planner?schema=public"
-SPOONACULAR_API_KEY="your_api_key_here"
+DATABASE_URL="file:./prisma/dev.db"
+RECIPE_PROVIDER="ollama"
+OLLAMA_BASE_URL="http://localhost:11434"
+OLLAMA_MODEL="llama3.2"
 ```
 
-Get a Spoonacular API key from: https://spoonacular.com/food-api
+Install Ollama from: https://ollama.com
+Then pull a model: `ollama pull llama3.2`
 
 ## Architecture
 
 ### Tech Stack
 - **Framework**: Next.js 15 (App Router)
 - **Language**: TypeScript
-- **Database**: PostgreSQL with Prisma ORM
+- **Database**: SQLite with Prisma ORM
 - **UI**: Tailwind CSS
-- **APIs**: Spoonacular (recipes), Puppeteer (Walmart automation)
+- **AI**: Ollama (local LLM - llama3.2 or mistral)
+- **Automation**: Puppeteer (Walmart cart)
 
 ### Directory Structure
 ```
@@ -56,7 +60,7 @@ app/
       ├── shopping-list/route.ts  # Aggregates ingredients
       └── walmart/add-to-cart/route.ts  # Puppeteer automation
 lib/
-  ├── spoonacular.ts              # Spoonacular API service
+  ├── recipe-generator.ts         # Ollama LLM recipe generation service
   ├── ingredients.ts              # Ingredient aggregation logic
   ├── walmart.ts                  # Puppeteer automation service
   └── prisma.ts                   # Prisma client singleton
@@ -66,17 +70,17 @@ prisma/
 
 ### Data Flow
 1. User enters family size and dietary restrictions
-2. `/api/meal-plan` calls Spoonacular to fetch 21 recipes (7 days × 3 meals)
-3. Meal plan stored in sessionStorage and displayed
+2. `/api/meal-plan` generates recipes using Ollama (7 days, one at a time)
+3. Meal plan stored in SQLite database and displayed at `/meal-plan/[id]`
 4. `/api/shopping-list` aggregates ingredients from all recipes
-5. Shopping list normalized (units converted, duplicates merged)
+5. Shopping list normalized (units converted, duplicates merged) and saved to database
 6. `/api/walmart/add-to-cart` uses Puppeteer to search and add items
 
 ### Key Features
 - **Ingredient Aggregation**: Normalizes measurements (cups, tbsp, grams) and combines duplicates
 - **Unit Conversion**: Converts various units to common base units for accurate aggregation
 - **Walmart Automation**: Headless browser automation to add items to cart
-- **Session Storage**: Temporary storage for meal plans and shopping lists
+- **Database Storage**: Persistent storage for meal plans and shopping lists in SQLite
 
 ## Key Conventions
 
@@ -95,10 +99,12 @@ prisma/
 - Returns list of failed items if some products can't be found
 - **Important**: Walmart's UI may change, requiring selector updates in `lib/walmart.ts`
 
-### Spoonacular Rate Limits
-- Free tier: 150 requests/day
-- Each meal plan generation uses 21 API calls
-- Add caching or upgrade plan for production use
+### Recipe Generation Performance
+- **llama3.2**: ~3 minutes for full 7-day meal plan (recommended)
+- **mistral**: ~5-7 minutes for full 7-day meal plan (better quality)
+- Each day is generated sequentially with 2-minute timeout per day
+- Uses Ollama's JSON mode for structured output
+- Low temperature (0.3) for consistent formatting
 
 ## Common Issues
 

@@ -10,9 +10,6 @@ export async function GET(
 
     const shoppingList = await prisma.shoppingList.findUnique({
       where: { id },
-      include: {
-        mealPlan: true,
-      },
     });
 
     if (!shoppingList) {
@@ -24,8 +21,7 @@ export async function GET(
 
     return NextResponse.json({
       success: true,
-      shoppingList: shoppingList.ingredients,
-      mealPlanId: shoppingList.mealPlanId,
+      ingredients: shoppingList.ingredients,
       createdAt: shoppingList.createdAt,
     });
   } catch (error) {

@@ -8,9 +8,9 @@ export default function Home() {
   const router = useRouter();
   const { setValue: setMealPlan } = useSessionStorage('mealPlan', null);
 
-  const handleSuccess = (mealPlan: any) => {
-    setMealPlan(mealPlan);
-    router.push('/meal-plan');
+  const handleSuccess = (data: any) => {
+    setMealPlan(data.mealPlan);
+    router.push(`/meal-plan/${data.mealPlanId}`);
   };
 
   return (

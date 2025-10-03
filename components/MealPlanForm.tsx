@@ -90,7 +90,13 @@ export function MealPlanForm({ onSuccess }: MealPlanFormProps) {
         throw new Error(data.error || 'Failed to generate meal plan');
       }
 
-      onSuccess(data.mealPlan);
+      console.log('Meal plan response:', data);
+
+      if (!data.mealPlanId) {
+        throw new Error('No meal plan ID returned from server');
+      }
+
+      onSuccess(data);
     } catch (err) {
       setApiError(err instanceof Error ? err.message : 'Something went wrong');
     } finally {

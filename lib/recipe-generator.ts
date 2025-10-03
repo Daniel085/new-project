@@ -60,9 +60,10 @@ class OllamaProvider implements LLMProvider {
           model: this.model,
           prompt,
           stream: false,
+          format: 'json',
           options: {
-            temperature: 0.7,
-            num_predict: 1500,
+            temperature: 0.3,
+            num_predict: 1200,
             num_ctx: 2048,
           }
         }),
@@ -82,13 +83,34 @@ class OllamaProvider implements LLMProvider {
       let responseText = data.response;
       console.log(`Raw response preview: ${responseText.substring(0, 200)}...`);
 
+      // Clean up common JSON issues from LLMs
       const jsonMatch = responseText.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
         console.error('Full response:', responseText);
         throw new Error('No JSON found in LLM response');
       }
 
-      const dayData = JSON.parse(jsonMatch[0]);
+      let jsonText = jsonMatch[0];
+
+      // Fix common LLM JSON issues
+      jsonText = jsonText
+        .trim()
+        .split('\n')[0]  // Take only first line if multi-line
+        .replace(/,\s*}/g, '}')  // Remove trailing commas
+        .replace(/,\s*]/g, ']')  // Remove trailing commas in arrays
+        .replace(/\.\.\./g, '')  // Remove ellipsis
+        .replace(/},\s*{"/g, ',"');  // Fix },{"lunch": to ,"lunch":
+
+      let dayData;
+      try {
+        dayData = JSON.parse(jsonText);
+      } catch (parseError) {
+        console.error('JSON parse error:', parseError);
+        console.error('Attempted to parse:', jsonText.substring(0, 500));
+        console.error('Full text length:', jsonText.length);
+        throw new Error('Invalid JSON from LLM');
+      }
+
       return this.parseSingleDay(dayData, dayIndex);
     } catch (error) {
       console.error(`Ollama generation error (day ${dayIndex + 1}):`, error);
@@ -103,7 +125,7 @@ class OllamaProvider implements LLMProvider {
     const dietNote = diet !== 'none' ? ` (${diet})` : '';
 
     return `Generate 3 meals for ${familySize} people${dietNote}. Reply with JSON only:
-{"breakfast":{"id":1,"title":"Omelette","image":"https://via.placeholder.com/556x370","readyInMinutes":20,"servings":${familySize},"sourceUrl":"","summary":"Eggs with veggies","extendedIngredients":[{"id":1,"name":"eggs","original":"4 eggs","amount":4,"unit":"","aisle":"Dairy"}]},"lunch":{"id":2,"title":"Chicken Wrap","image":"https://via.placeholder.com/556x370","readyInMinutes":15,"servings":${familySize},"sourceUrl":"","summary":"Grilled chicken wrap","extendedIngredients":[{"id":2,"name":"chicken","original":"2 chicken breasts","amount":2,"unit":"","aisle":"Meat"}]},"dinner":{"id":3,"title":"Spaghetti","image":"https://via.placeholder.com/556x370","readyInMinutes":30,"servings":${familySize},"sourceUrl":"","summary":"Pasta with sauce","extendedIngredients":[{"id":3,"name":"pasta","original":"1 lb pasta","amount":1,"unit":"lb","aisle":"Pasta"}]}}`;
+{"breakfast":{"id":1,"title":"Omelette","readyInMinutes":20,"servings":${familySize},"summary":"Eggs with veggies","extendedIngredients":[{"id":1,"name":"eggs","original":"4 eggs","amount":4,"unit":"","aisle":"Dairy"}]},"lunch":{"id":2,"title":"Chicken Wrap","readyInMinutes":15,"servings":${familySize},"summary":"Grilled chicken wrap","extendedIngredients":[{"id":2,"name":"chicken","original":"2 chicken breasts","amount":2,"unit":"","aisle":"Meat"}]},"dinner":{"id":3,"title":"Spaghetti","readyInMinutes":30,"servings":${familySize},"summary":"Pasta with sauce","extendedIngredients":[{"id":3,"name":"pasta","original":"1 lb pasta","amount":1,"unit":"lb","aisle":"Pasta"}]}}`;
   }
 
   private parseSingleDay(data: any, dayIndex: number): MealPlanDay {
@@ -142,7 +164,7 @@ class OllamaProvider implements LLMProvider {
     return {
       id: recipe.id || Math.floor(Math.random() * 1000000),
       title: recipe.title || 'Untitled Recipe',
-      image: recipe.image || 'https://via.placeholder.com/556x370',
+      image: recipe.image || '',  // Empty string instead of placeholder
       readyInMinutes: recipe.readyInMinutes || 30,
       servings: recipe.servings || 4,
       sourceUrl: recipe.sourceUrl || '',

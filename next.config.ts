@@ -13,6 +13,11 @@ const nextConfig: NextConfig = {
         hostname: 'img.spoonacular.com',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'via.placeholder.com',
+        pathname: '/**',
+      },
     ],
   },
   async headers() {
@@ -26,7 +31,7 @@ const nextConfig: NextConfig = {
               "default-src 'self'",
               "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
               "style-src 'self' 'unsafe-inline'",
-              "img-src 'self' data: https://spoonacular.com https://img.spoonacular.com",
+              "img-src 'self' data: https://spoonacular.com https://img.spoonacular.com https://via.placeholder.com",
               "font-src 'self' data:",
               "connect-src 'self'",
               "frame-ancestors 'none'",
