@@ -45,8 +45,11 @@ class OllamaProvider implements LLMProvider {
     const prompt = this.buildDayPrompt(familySize, diet, dayIndex);
 
     try {
+      console.log(`📅 Generating day ${dayIndex + 1}/7 with ${this.model}...`);
+      const startTime = Date.now();
+
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 60000); // 1 minute timeout per day
+      const timeout = setTimeout(() => controller.abort(), 120000); // 2 minute timeout per day
 
       const response = await fetch(`${this.baseUrl}/api/generate`, {
         method: 'POST',
@@ -59,7 +62,8 @@ class OllamaProvider implements LLMProvider {
           stream: false,
           options: {
             temperature: 0.7,
-            num_predict: 2048,
+            num_predict: 1500,
+            num_ctx: 2048,
           }
         }),
         signal: controller.signal,
@@ -72,29 +76,34 @@ class OllamaProvider implements LLMProvider {
       }
 
       const data = await response.json();
+      console.log(`✓ Day ${dayIndex + 1} generated in ${Date.now() - startTime}ms`);
 
       // Extract JSON from response
       let responseText = data.response;
+      console.log(`Raw response preview: ${responseText.substring(0, 200)}...`);
+
       const jsonMatch = responseText.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
+        console.error('Full response:', responseText);
         throw new Error('No JSON found in LLM response');
       }
 
       const dayData = JSON.parse(jsonMatch[0]);
       return this.parseSingleDay(dayData, dayIndex);
     } catch (error) {
-      console.error('Ollama generation error:', error);
-      throw new Error('Failed to generate meal plan with Ollama. Make sure Ollama is running.');
+      console.error(`Ollama generation error (day ${dayIndex + 1}):`, error);
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error(`Timeout generating day ${dayIndex + 1}. Try using a faster model like llama3.2`);
+      }
+      throw error;
     }
   }
 
   private buildDayPrompt(familySize: number, diet: string, dayIndex: number): string {
-    const dietConstraint = diet !== 'none' ? ` Must be ${diet}.` : '';
+    const dietNote = diet !== 'none' ? ` (${diet})` : '';
 
-    return `Create 3 recipes (breakfast, lunch, dinner) for ${familySize} people.${dietConstraint}
-
-Return JSON:
-{"breakfast":{"id":1,"title":"Scrambled Eggs","image":"https://via.placeholder.com/556x370","readyInMinutes":15,"servings":${familySize},"sourceUrl":"https://example.com","summary":"Quick protein-rich breakfast","extendedIngredients":[{"id":1,"name":"eggs","original":"${familySize * 2} eggs","amount":${familySize * 2},"unit":"","aisle":"Dairy"}]},"lunch":{"id":2,"title":"Grilled Chicken Salad","image":"https://via.placeholder.com/556x370","readyInMinutes":25,"servings":${familySize},"sourceUrl":"https://example.com","summary":"Healthy lunch","extendedIngredients":[{"id":3,"name":"chicken breast","original":"${familySize} chicken breasts","amount":${familySize},"unit":"","aisle":"Meat"}]},"dinner":{"id":3,"title":"Pasta Primavera","image":"https://via.placeholder.com/556x370","readyInMinutes":30,"servings":${familySize},"sourceUrl":"https://example.com","summary":"Fresh veggie pasta","extendedIngredients":[{"id":5,"name":"pasta","original":"1 lb pasta","amount":1,"unit":"lb","aisle":"Pasta"}]}}`;
+    return `Generate 3 meals for ${familySize} people${dietNote}. Reply with JSON only:
+{"breakfast":{"id":1,"title":"Omelette","image":"https://via.placeholder.com/556x370","readyInMinutes":20,"servings":${familySize},"sourceUrl":"","summary":"Eggs with veggies","extendedIngredients":[{"id":1,"name":"eggs","original":"4 eggs","amount":4,"unit":"","aisle":"Dairy"}]},"lunch":{"id":2,"title":"Chicken Wrap","image":"https://via.placeholder.com/556x370","readyInMinutes":15,"servings":${familySize},"sourceUrl":"","summary":"Grilled chicken wrap","extendedIngredients":[{"id":2,"name":"chicken","original":"2 chicken breasts","amount":2,"unit":"","aisle":"Meat"}]},"dinner":{"id":3,"title":"Spaghetti","image":"https://via.placeholder.com/556x370","readyInMinutes":30,"servings":${familySize},"sourceUrl":"","summary":"Pasta with sauce","extendedIngredients":[{"id":3,"name":"pasta","original":"1 lb pasta","amount":1,"unit":"lb","aisle":"Pasta"}]}}`;
   }
 
   private parseSingleDay(data: any, dayIndex: number): MealPlanDay {
