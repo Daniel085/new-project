@@ -47,22 +47,20 @@ Then pull a model: `ollama pull llama3.2`
 - **Database**: SQLite with Prisma ORM
 - **UI**: Tailwind CSS
 - **AI**: Ollama (local LLM - llama3.2 or mistral)
-- **Automation**: Puppeteer (Walmart cart)
 
 ### Directory Structure
 ```
 app/
   ├── page.tsx                    # Home page with family preferences form
-  ├── meal-plan/page.tsx          # Displays 7-day meal plan
-  ├── shopping-list/page.tsx      # Shows aggregated ingredients
+  ├── meal-plan/[id]/page.tsx     # Displays 7-day meal plan
+  ├── shopping-list/[id]/page.tsx # Shows aggregated ingredients
   └── api/
       ├── meal-plan/route.ts      # Generates weekly meal plan
+      ├── meal-plan/[id]/route.ts # Fetches meal plan by ID
       ├── shopping-list/route.ts  # Aggregates ingredients
-      └── walmart/add-to-cart/route.ts  # Puppeteer automation
+      └── shopping-list/[id]/route.ts  # Fetches shopping list by ID
 lib/
   ├── recipe-generator.ts         # Ollama LLM recipe generation service
-  ├── ingredients.ts              # Ingredient aggregation logic
-  ├── walmart.ts                  # Puppeteer automation service
   └── prisma.ts                   # Prisma client singleton
 prisma/
   └── schema.prisma               # Database schema (User, MealPlan, ShoppingList)
@@ -73,14 +71,13 @@ prisma/
 2. `/api/meal-plan` generates recipes using Ollama (7 days, one at a time)
 3. Meal plan stored in SQLite database and displayed at `/meal-plan/[id]`
 4. `/api/shopping-list` aggregates ingredients from all recipes
-5. Shopping list normalized (units converted, duplicates merged) and saved to database
-6. `/api/walmart/add-to-cart` uses Puppeteer to search and add items
+5. Shopping list normalized and saved to database at `/shopping-list/[id]`
 
 ### Key Features
-- **Ingredient Aggregation**: Normalizes measurements (cups, tbsp, grams) and combines duplicates
-- **Unit Conversion**: Converts various units to common base units for accurate aggregation
-- **Walmart Automation**: Headless browser automation to add items to cart
+- **AI Recipe Generation**: Uses local LLM via Ollama to generate creative meal plans
 - **Database Storage**: Persistent storage for meal plans and shopping lists in SQLite
+- **Sequential Generation**: Generates one day at a time to avoid timeouts
+- **JSON Mode**: Uses Ollama's JSON format option for consistent structured output
 
 ## Key Conventions
 
@@ -88,16 +85,7 @@ prisma/
 - All API routes return JSON with `{ success: boolean, ... }` format
 - Error responses include `{ error: string }` with appropriate HTTP status codes
 
-### Ingredient Parsing
-- Uses `normalizeIngredientName()` to match similar ingredients (e.g., "onion" = "yellow onion")
-- Converts to base units (cups for volume, grams for weight) before aggregating
-- Rounds amounts to user-friendly values (nearest 1/4 cup, 10g, etc.)
 
-### Walmart Automation
-- Runs in non-headless mode so users can log in if needed
-- Waits 1 second between adding items to avoid rate limiting
-- Returns list of failed items if some products can't be found
-- **Important**: Walmart's UI may change, requiring selector updates in `lib/walmart.ts`
 
 ### Recipe Generation Performance
 - **llama3.2**: ~3 minutes for full 7-day meal plan (recommended)
@@ -108,22 +96,27 @@ prisma/
 
 ## Common Issues
 
-### Puppeteer Installation
-If Puppeteer fails to install, run:
+### Ollama Not Running
+If recipe generation fails with "Failed to generate meal plan with Ollama":
 ```bash
-PUPPETEER_SKIP_DOWNLOAD=true npm install puppeteer
-npx puppeteer browsers install chrome
+# Start Ollama service
+ollama serve
+
+# In another terminal, verify it's running
+curl http://localhost:11434/api/tags
 ```
 
-### Walmart Selectors Breaking
-Walmart frequently updates their website. If automation fails, inspect their current HTML and update selectors in `lib/walmart.ts`:
-- Search input: `input[aria-label="Search"]`
-- Add to cart button: `button[data-automation-id="add-to-cart"]`
-- Product list: `[data-testid="list-view"]`
+### Model Not Installed
+If you get timeout errors, make sure you've pulled a model:
+```bash
+ollama pull llama3.2
+# Or for better quality:
+ollama pull mistral
+```
 
 ### Database Not Found
 Run migrations first:
 ```bash
-npx prisma migrate dev --name init
+npx prisma migrate dev
 npx prisma generate
 ```

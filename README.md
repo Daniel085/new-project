@@ -7,8 +7,7 @@ A Next.js application that generates weekly meal plans using local LLMs (via Oll
 - 🍽️ Generate 7-day meal plans with breakfast, lunch, and dinner using AI
 - 🤖 Powered by local LLMs via Ollama (no API keys required!)
 - 👨‍👩‍👧‍👦 Customize for family size and dietary restrictions
-- 🛒 Automatically add all ingredients to Walmart cart
-- 📊 Smart ingredient aggregation (combines duplicates, converts units)
+- 📊 Smart ingredient aggregation and shopping lists
 - 🎨 Clean, responsive UI
 - 💾 SQLite database (no PostgreSQL setup needed)
 
@@ -69,7 +68,6 @@ Get Ollama at: https://ollama.com
 2. The app generates recipes using Ollama's local LLM (takes ~3 minutes for 7 days)
 3. View your personalized 7-day meal plan
 4. Click to see your shopping list with all ingredients aggregated
-5. One click adds everything to your Walmart cart via browser automation
 
 ## Tech Stack
 
@@ -77,7 +75,6 @@ Get Ollama at: https://ollama.com
 - **Database**: SQLite + Prisma
 - **Styling**: Tailwind CSS
 - **AI**: Ollama (local LLM - llama3.2 or mistral recommended)
-- **Automation**: Puppeteer (Walmart cart)
 
 ## Configuration
 
@@ -101,9 +98,8 @@ OLLAMA_MODEL="mistral"
 ## Limitations
 
 - Recipe generation takes 2-5 minutes depending on model
-- Walmart automation may break if their website changes
-- Requires user to be logged into Walmart
 - Requires Ollama running locally
+- LLM-generated recipes may vary in quality and accuracy
 
 ## Development
 
