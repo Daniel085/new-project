@@ -110,15 +110,34 @@ class OllamaProvider implements LLMProvider {
     const currentDate = new Date();
     const date = new Date(currentDate.getTime() + dayIndex * 24 * 60 * 60 * 1000);
 
+    // Handle both formats: {"breakfast": {}, "lunch": {}, "dinner": {}} and {"meals": [...]}
+    let breakfast, lunch, dinner;
+
+    if (data.breakfast && data.lunch && data.dinner) {
+      breakfast = data.breakfast;
+      lunch = data.lunch;
+      dinner = data.dinner;
+    } else if (data.meals && Array.isArray(data.meals)) {
+      breakfast = data.meals[0];
+      lunch = data.meals[1];
+      dinner = data.meals[2];
+    } else {
+      throw new Error('Invalid meal plan format from LLM');
+    }
+
     return {
       date: date.toISOString().split('T')[0],
-      breakfast: this.validateRecipe(data.breakfast),
-      lunch: this.validateRecipe(data.lunch),
-      dinner: this.validateRecipe(data.dinner),
+      breakfast: this.validateRecipe(breakfast),
+      lunch: this.validateRecipe(lunch),
+      dinner: this.validateRecipe(dinner),
     };
   }
 
   private validateRecipe(recipe: any): Recipe {
+    if (!recipe) {
+      throw new Error('Recipe is null or undefined');
+    }
+
     // Ensure all required fields exist with defaults
     return {
       id: recipe.id || Math.floor(Math.random() * 1000000),
@@ -126,14 +145,14 @@ class OllamaProvider implements LLMProvider {
       image: recipe.image || 'https://via.placeholder.com/556x370',
       readyInMinutes: recipe.readyInMinutes || 30,
       servings: recipe.servings || 4,
-      sourceUrl: recipe.sourceUrl || 'https://example.com',
+      sourceUrl: recipe.sourceUrl || '',
       summary: recipe.summary || 'A delicious recipe',
-      extendedIngredients: (recipe.extendedIngredients || []).map((ing: any, idx: number) => ({
+      extendedIngredients: (recipe.extendedIngredients || recipe.ingredients || []).map((ing: any, idx: number) => ({
         id: ing.id || idx,
-        name: ing.name || 'unknown',
-        original: ing.original || `${ing.amount} ${ing.unit} ${ing.name}`,
+        name: ing.name || ing.ingredient || 'unknown',
+        original: ing.original || `${ing.amount || 1} ${ing.unit || ''} ${ing.name || ing.ingredient || ''}`.trim(),
         amount: ing.amount || 1,
-        unit: ing.unit || 'unit',
+        unit: ing.unit || '',
         aisle: ing.aisle || 'Other',
       })),
     };
