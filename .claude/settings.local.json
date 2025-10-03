@@ -13,7 +13,8 @@
       "Bash(npx prisma:*)",
       "Bash(npm run type-check:*)",
       "WebFetch(domain:github.com)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(ollama pull:*)"
     ],
     "deny": [],
     "ask": []
