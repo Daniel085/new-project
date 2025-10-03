@@ -30,9 +30,24 @@ class OllamaProvider implements LLMProvider {
   async generateMealPlan(request: LLMRecipeRequest): Promise<MealPlanDay[]> {
     const { familySize, diet = 'none', daysOfWeek = 7 } = request;
 
-    const prompt = this.buildPrompt(familySize, diet, daysOfWeek);
+    const mealPlan: MealPlanDay[] = [];
+
+    // Generate one day at a time to avoid timeouts
+    for (let day = 0; day < daysOfWeek; day++) {
+      const dayPlan = await this.generateSingleDay(familySize, diet, day);
+      mealPlan.push(dayPlan);
+    }
+
+    return mealPlan;
+  }
+
+  private async generateSingleDay(familySize: number, diet: string, dayIndex: number): Promise<MealPlanDay> {
+    const prompt = this.buildDayPrompt(familySize, diet, dayIndex);
 
     try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 60000); // 1 minute timeout per day
+
       const response = await fetch(`${this.baseUrl}/api/generate`, {
         method: 'POST',
         headers: {
@@ -42,9 +57,15 @@ class OllamaProvider implements LLMProvider {
           model: this.model,
           prompt,
           stream: false,
-          // Removed format: 'json' - causes timeouts with large responses
+          options: {
+            temperature: 0.7,
+            num_predict: 2048,
+          }
         }),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeout);
 
       if (!response.ok) {
         throw new Error(`Ollama API error: ${response.statusText}`);
@@ -52,88 +73,40 @@ class OllamaProvider implements LLMProvider {
 
       const data = await response.json();
 
-      // Extract JSON from response (model might include markdown code blocks)
+      // Extract JSON from response
       let responseText = data.response;
       const jsonMatch = responseText.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
         throw new Error('No JSON found in LLM response');
       }
 
-      const mealPlanData = JSON.parse(jsonMatch[0]);
-      return this.parseMealPlan(mealPlanData);
+      const dayData = JSON.parse(jsonMatch[0]);
+      return this.parseSingleDay(dayData, dayIndex);
     } catch (error) {
       console.error('Ollama generation error:', error);
       throw new Error('Failed to generate meal plan with Ollama. Make sure Ollama is running.');
     }
   }
 
-  private buildPrompt(familySize: number, diet: string, days: number): string {
-    const dietConstraint = diet !== 'none' ? `dietary restriction: ${diet}` : 'no dietary restrictions';
+  private buildDayPrompt(familySize: number, diet: string, dayIndex: number): string {
+    const dietConstraint = diet !== 'none' ? ` Must be ${diet}.` : '';
 
-    return `You are a meal planning assistant. Generate a ${days}-day meal plan for ${familySize} people with ${dietConstraint}.
+    return `Create 3 recipes (breakfast, lunch, dinner) for ${familySize} people.${dietConstraint}
 
-IMPORTANT: Maximize ingredient overlap across meals to minimize grocery shopping and waste. For example:
-- If you use chicken, use it in 3-4 different meals
-- If you buy carrots, incorporate them into multiple recipes
-- Buy ingredients in bulk (like olive oil, garlic, onions) and use throughout the week
-
-Generate creative, practical recipes that share common ingredients.
-
-For each day, provide breakfast, lunch, and dinner with:
-- Recipe title
-- Ready time in minutes (realistic)
-- Servings (should serve ${familySize} people)
-- Full ingredient list with amounts and units
-- Brief summary (2-3 sentences)
-
-Return ONLY valid JSON in this exact format (no markdown, no explanation):
-{
-  "mealPlan": [
-    {
-      "date": "2024-01-01",
-      "breakfast": {
-        "id": 1,
-        "title": "Recipe Name",
-        "image": "https://via.placeholder.com/556x370",
-        "readyInMinutes": 30,
-        "servings": ${familySize},
-        "sourceUrl": "https://example.com",
-        "summary": "Brief description of the recipe",
-        "extendedIngredients": [
-          {
-            "id": 1,
-            "name": "ingredient name",
-            "original": "1 cup ingredient name",
-            "amount": 1,
-            "unit": "cup",
-            "aisle": "Produce"
-          }
-        ]
-      },
-      "lunch": { ... },
-      "dinner": { ... }
-    }
-  ]
-}`;
+Return JSON:
+{"breakfast":{"id":1,"title":"Scrambled Eggs","image":"https://via.placeholder.com/556x370","readyInMinutes":15,"servings":${familySize},"sourceUrl":"https://example.com","summary":"Quick protein-rich breakfast","extendedIngredients":[{"id":1,"name":"eggs","original":"${familySize * 2} eggs","amount":${familySize * 2},"unit":"","aisle":"Dairy"}]},"lunch":{"id":2,"title":"Grilled Chicken Salad","image":"https://via.placeholder.com/556x370","readyInMinutes":25,"servings":${familySize},"sourceUrl":"https://example.com","summary":"Healthy lunch","extendedIngredients":[{"id":3,"name":"chicken breast","original":"${familySize} chicken breasts","amount":${familySize},"unit":"","aisle":"Meat"}]},"dinner":{"id":3,"title":"Pasta Primavera","image":"https://via.placeholder.com/556x370","readyInMinutes":30,"servings":${familySize},"sourceUrl":"https://example.com","summary":"Fresh veggie pasta","extendedIngredients":[{"id":5,"name":"pasta","original":"1 lb pasta","amount":1,"unit":"lb","aisle":"Pasta"}]}}`;
   }
 
-  private parseMealPlan(data: any): MealPlanDay[] {
-    if (!data.mealPlan || !Array.isArray(data.mealPlan)) {
-      throw new Error('Invalid meal plan structure from LLM');
-    }
+  private parseSingleDay(data: any, dayIndex: number): MealPlanDay {
+    const currentDate = new Date();
+    const date = new Date(currentDate.getTime() + dayIndex * 24 * 60 * 60 * 1000);
 
-    return data.mealPlan.map((day: any) => {
-      const currentDate = new Date();
-      const dayIndex = data.mealPlan.indexOf(day);
-      const date = new Date(currentDate.getTime() + dayIndex * 24 * 60 * 60 * 1000);
-
-      return {
-        date: date.toISOString().split('T')[0],
-        breakfast: this.validateRecipe(day.breakfast),
-        lunch: this.validateRecipe(day.lunch),
-        dinner: this.validateRecipe(day.dinner),
-      };
-    });
+    return {
+      date: date.toISOString().split('T')[0],
+      breakfast: this.validateRecipe(data.breakfast),
+      lunch: this.validateRecipe(data.lunch),
+      dinner: this.validateRecipe(data.dinner),
+    };
   }
 
   private validateRecipe(recipe: any): Recipe {
